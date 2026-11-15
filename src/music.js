@@ -70,6 +70,23 @@ export function initMusic(button, status) {
     audio.volume = 0;
     if (!document.hidden && enabled) void play();
   });
+  // Looping normally seeks back to the start, which fails on servers that
+  // cannot serve part of a file: the song then just stops. Reloading the
+  // file at the end restarts it everywhere, so do that by hand.
+  let restarting = false;
+  function restart() {
+    if (restarting) return;
+    restarting = true;
+    stopFade();
+    audio.volume = 0;
+    audio.load?.();
+    if (enabled && !document.hidden) void play();
+  }
+  audio.addEventListener('playing', () => { restarting = false; });
+  audio.addEventListener('ended', restart);
+  audio.addEventListener('timeupdate', () => {
+    if (Number.isFinite(audio.duration) && audio.duration > 1 && audio.currentTime > audio.duration - 0.3) restart();
+  });
   audio.addEventListener('error', () => {
     ++request;
     enabled = false;

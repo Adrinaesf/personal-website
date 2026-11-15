@@ -446,10 +446,32 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     const glow = new THREE.Sprite(glowMaterial); glow.scale.setScalar(2.4); group.add(glow);
     return { group, gem, x, z, baseY, phase: index * 0.9, collected: false };
   });
-  let collected = 0, celebration = -1, gazeFrom = 0;
   const ease = t => { t = THREE.MathUtils.clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  // After the last star, a sea of low clouds rolls out from under the visitor's feet.
+  // They are faceted like the rocks and mountains, and stay below eye level.
+  const cloudCount = 720, cloudData = [];
+  const clouds = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xf3e8ec, emissive: 0x514456, emissiveIntensity: 0.6, roughness: 1, flatShading: true, transparent: true, opacity: 0.94 }), cloudCount);
+  clouds.visible = false; clouds.frustumCulled = false; scene.add(clouds);
+  while (cloudData.length < cloudCount) {
+    const x = (random() - 0.5) * 114, z = -34 + random() * 72;
+    if ([...stations.values()].some(({ group }) => Math.hypot(x - group.position.x, z - group.position.z) < 3.3)) continue;
+    cloudData.push({ x, z, y: groundHeight(x, z), width: 1.1 + random() * 1.6, height: 0.4 + random() * 0.45, phase: random() * 6.28, spin: random() * 3 });
+  }
+  let cloudProgress = 0, cloudX = 0, cloudZ = 0;
+  function layoutClouds() {
+    cloudData.forEach((cloud, index) => {
+      const grow = ease(cloudProgress * 2.2 - Math.hypot(cloud.x - cloudX, cloud.z - cloudZ) / 55);
+      dummy.position.set(cloud.x + Math.sin(clock * 0.12 + cloud.phase) * 0.9, cloud.y + cloud.height * 0.3 * grow - (1 - grow) * 1.2 + Math.sin(clock * 0.5 + cloud.phase) * 0.05, cloud.z + Math.cos(clock * 0.1 + cloud.phase) * 0.9);
+      dummy.rotation.set(0, cloud.spin + clock * 0.03, 0);
+      dummy.scale.set(cloud.width * grow + 0.001, cloud.height * grow + 0.001, cloud.width * (0.75 + 0.25 * Math.sin(cloud.phase)) * grow + 0.001);
+      dummy.updateMatrix(); clouds.setMatrixAt(index, dummy.matrix);
+    });
+    clouds.instanceMatrix.needsUpdate = true;
+  }
+  let collected = 0, celebration = -1, gazeFrom = 0;
   function celebrate() {
-    if (paused) { starMaterial.uniforms.flare.value = 0.45; auroraMaterial.uniforms.intensity.value = 0.62; return; }
+    clouds.visible = true; cloudX = camera.position.x; cloudZ = camera.position.z;
+    if (paused) { starMaterial.uniforms.flare.value = 0.45; auroraMaterial.uniforms.intensity.value = 0.62; cloudProgress = 1.4; layoutClouds(); return; }
     celebration = 0; gazeFrom = pitch; showerLeft = 70; showerGap = 0.6;
   }
   function updateCelebration(delta) {
@@ -466,6 +488,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
   function updateWorld(delta) {
     if (!paused) {
       updateMeteors(delta); updateCelebration(delta);
+      if (clouds.visible) { cloudProgress = Math.min(1.4, cloudProgress + delta / 6); layoutClouds(); }
       flames.forEach((flame, index) => {
         flame.scale.y = 1 + Math.sin(clock * 9 + index * 2) * 0.16 + Math.sin(clock * 23 + index) * 0.08;
         flame.scale.x = flame.scale.z = 1 + Math.sin(clock * 13 + index * 3) * 0.1;

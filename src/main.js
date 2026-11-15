@@ -81,7 +81,7 @@ function onCollect({ count, total: stars }) {
     showToast('✦ All seven. Look up!');
     for (let step = 0; step < 7; step++) setTimeout(() => chime(step), 250 + step * 120);
     document.body.classList.add('celebrating'); setTimeout(() => document.body.classList.remove('celebrating'), 3000);
-    say('That’s all seven. Look up.', 'Every star is out for you tonight.');
+    say('That’s all seven. Look up.', 'Every star is out for you tonight. And look down: you’re walking on clouds.');
   }
 }
 
@@ -232,4 +232,5 @@ for (const button of document.querySelectorAll('[data-destination]')) {
     }
   });
 }
+
 

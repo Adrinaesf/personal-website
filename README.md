@@ -11,7 +11,7 @@ A personal portfolio you explore as a first-person game. Walk through a red-lit,
 - **An explorable 3D world:** procedural mountains, textured terrain, and 1,600 instanced stones.
 - **A living sky:** twinkling stars, shooting stars, a crescent moon, an aurora over the northern ridge, fireflies, and a campfire.
 - **Five discoverable locations:** Base camp, Project archive, Observatory, Radio station, and My life.
-- **Seven fallen stars to collect:** each sends up a column of light; finding all seven lights up every star in the sky, with a meteor shower and a brighter aurora.
+- **Seven fallen stars to collect:** each sends up a column of light; finding all seven lights up every star in the sky, with a meteor shower and a brighter aurora, and rolls a sea of low clouds across the ground.
 - **A scrapbook interface:** journals open as paper pages with taped polaroids, and every control is a hand-drawn paper tag.
 - **Game navigation:** walking, drag-to-look, illuminated paths, a compass, destination tabs, a map, and a return-to-camp control.
 - **A roaming guide:** River, a small dog who introduces the world, then walks, pauses, sniffs, avoids landmarks, and catches up when the visitor moves away. Selecting him opens the story of the real dog by the river who inspired him.

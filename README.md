@@ -16,7 +16,7 @@ A personal portfolio you explore as a first-person game. Walk through a red-lit,
 - **Game navigation:** walking, drag-to-look, illuminated paths, a compass, destination tabs, a map, and a return-to-camp control.
 - **A roaming guide:** River, a small dog who introduces the world, then walks, pauses, sniffs, avoids landmarks, and catches up when the visitor moves away. Selecting him opens the story of the real dog by the river who inspired him.
 - **A personal journal:** resume-backed projects and experience, plus hiking, friends, hackathons, animals, and robotics interests, with Adrina’s own photographs. Four of them also hang as polaroids on a line at the campsite.
-- **Music controls:** the supplied soundtrack is enabled by default, with an Off button, fades, looping, and background pause. If the browser blocks autoplay, selecting Enter starts playback.
+- **Music controls:** the supplied soundtrack is enabled by default, with an Off button, quiet playback, native looping, and background pause. If the browser blocks autoplay, selecting Enter starts playback.
 - **Accessible alternatives:** keyboard and touch controls, reduced-motion support, readable journals, and direct journal access through the map when WebGL is unavailable.
 
 ## Technology
@@ -60,7 +60,7 @@ src/
   scene.js              World geometry, walking, landmarks, navigation
   companions.js         African wild dog model and roaming behaviour
   main.js               Interface, discoveries, journals, touch controls
-  music.js              Playback, fades, autoplay and visibility handling
+  music.js              Playback, looping, autoplay and visibility handling
 scripts/
   build.mjs             JavaScript bundling
 tests/
@@ -101,7 +101,7 @@ pnpm test
 pnpm build
 ```
 
-The six regression tests cover overlapping player/landmark exclusions, paused catch-up, bounded and grounded dog roaming, blocked-autoplay retry, pending-play cancellation, rapid music toggles, and background pause. Desktop and mobile layouts and the main game interactions were also checked in a browser.
+The regression tests cover overlapping player/landmark exclusions, paused catch-up, bounded and grounded dog roaming, blocked/interrupted autoplay retry, media-error recovery, uninterrupted native looping, pending-play cancellation, rapid music toggles, and background pause. Desktop and mobile layouts and the main game interactions were also checked in a browser.
 
 ## Deployment
 

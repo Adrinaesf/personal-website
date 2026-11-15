@@ -553,19 +553,19 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     const state = getPlayerState(); onLocation(state); onUpdate(state);
   }
   function getPlayerState() { return { x: camera.position.x, z: camera.position.z, yaw, heading: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearest: nearestTarget() }; }
-  // Saying hi brings River over: he circles the visitor and sits, and only then does his page open.
+  // River sits and looks at the visitor only while they are close and facing him.
+  // Saying hi from farther off holds that pose for a moment before his page opens.
   let hiPending = -1;
   function sayHi() {
     if (hiPending >= 0) return;
     if (paused || companions.isSitting()) { onSelect('wanderer'); return; }
-    companions.greet(); hiPending = 0;
+    hiPending = 0;
   }
   function updateHi(delta) {
     if (hiPending < 0) return;
     hiPending += delta;
-    if (companions.isSitting() ? hiPending > 0 && (hiSat += delta) > 1.6 : hiPending > 9) { hiPending = -1; hiSat = 0; onSelect('wanderer'); }
+    if (hiPending > 0.9) { hiPending = -1; onSelect('wanderer'); }
   }
-  let hiSat = 0;
   function nearestTarget() {
     const station = nearestStation(); if (station) return station.id;
     const dx = companions.dog.position.x - camera.position.x, dz = companions.dog.position.z - camera.position.z, d = Math.hypot(dx, dz);
@@ -625,7 +625,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
       changed = true;
     }
     updateWorld(delta); updateHi(delta);
-    const companionChanged = companions.update({ position: camera.position, yaw, delta, time: clock, moving: changed, paused: paused || !active });
+    const companionChanged = companions.update({ position: camera.position, yaw, delta, time: clock, moving: changed, paused: paused || !active, meeting: hiPending >= 0 || nearestTarget() === 'wanderer' });
     orient();
     if (!paused || changed || companionChanged || time - lastProjection > 500) { render(); lastProjection = time; }
     frame = requestAnimationFrame(animate);

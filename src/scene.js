@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createCompanions } from './companions.js';
 
 /** A procedural night landscape. Content and navigation remain ordinary HTML. */
-export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onProject = () => {}, onLocation = () => {}, onUpdate = () => {} }) {
+export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onProject = () => {}, onLocation = () => {}, onUpdate = () => {}, onCollect = () => {} }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
   renderer.setClearColor(0x04111e, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -18,7 +18,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
 
   let seed = 562341;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-  const objects = [];
+  const objects = [], textures = [], polaroids = [];
   const add = (object) => { scene.add(object); objects.push(object); return object; };
   scene.add(new THREE.HemisphereLight(0x7188ac, 0x160609, 0.48));
   const moon = new THREE.DirectionalLight(0x6a86ac, 0.72); moon.position.set(-40, 55, 10); scene.add(moon);
@@ -230,19 +230,34 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
   beam(campsite, [0, 2.7, -1.55], [0, 2.7, 1.55], 0.035);
   const warm = new THREE.PointLight(0xffc58d, 120, 12, 2); warm.position.set(0, 1.4, 1.7); campsite.add(warm);
   part(campsite, new THREE.CylinderGeometry(0.17, 0.17, 0.35, 12), amberGlow, [0.8, 0.45, 1.4]);
-  // Empty reflective frames await the owner's own photographs; no invented images.
-  const frameMetal = new THREE.MeshStandardMaterial({ color: 0xc0a27e, metalness: 0.55, roughness: 0.55 });
-  const emptyFrame = new THREE.MeshStandardMaterial({ color: 0x24323a, metalness: 0.7, roughness: 0.28, side: THREE.DoubleSide });
-  for (const x of [-2.6, 2.6]) beam(campsite, [x, 0.2, 2.2], [x, 4.0, 2.2], 0.045, darkMetal);
-  const memoryLine = new THREE.CatmullRomCurve3([new THREE.Vector3(-2.6, 3.95, 2.2), new THREE.Vector3(0, 3.55, 2.2), new THREE.Vector3(2.6, 3.95, 2.2)]);
-  part(campsite, new THREE.TubeGeometry(memoryLine, 24, 0.015, 4, false), frameMetal);
-  for (let i = 0; i < 3; i++) {
-    const x = (i - 1) * 1.2, frame = new THREE.Group(); frame.position.set(x, 3.1 + Math.abs(x) * 0.1, 2.2); frame.rotation.z = (i - 1) * 0.06; campsite.add(frame);
-    part(frame, new THREE.PlaneGeometry(0.64, 0.79), emptyFrame);
-    for (const y of [-0.43, 0.43]) part(frame, new THREE.BoxGeometry(0.78, 0.06, 0.06), frameMetal, [0, y, 0]);
-    for (const x of [-0.36, 0.36]) part(frame, new THREE.BoxGeometry(0.06, 0.85, 0.06), frameMetal, [x, 0, 0]);
-    beam(frame, [0, 0.44, 0], [0, 0.59, 0], 0.012, frameMetal);
-  }
+  // Polaroids of Adrina's friends hang on a line in front of the tent.
+  const lineHalf = 3.1, lineSag = 0.5, lineTop = 4.0;
+  const lineY = x => lineTop - lineSag * (1 - Math.pow(x / lineHalf, 2));
+  const twine = new THREE.MeshStandardMaterial({ color: 0xc0a27e, roughness: 0.8 });
+  const polaroidPaper = new THREE.MeshStandardMaterial({ color: 0xf1e9da, roughness: 0.9, emissive: 0x6b6253, emissiveIntensity: 0.55, side: THREE.DoubleSide });
+  const pegWood = new THREE.MeshStandardMaterial({ color: 0xb98a55, roughness: 0.9 });
+  for (const x of [-lineHalf, lineHalf]) beam(campsite, [x, 0.2, 2.2], [x, lineTop + 0.05, 2.2], 0.045, darkMetal);
+  const memoryLine = new THREE.CatmullRomCurve3([-1, -0.5, 0, 0.5, 1].map(t => new THREE.Vector3(t * lineHalf, lineY(t * lineHalf), 2.2)));
+  part(campsite, new THREE.TubeGeometry(memoryLine, 32, 0.014, 4, false), twine);
+  const textureLoader = new THREE.TextureLoader();
+  const campPhotos = [['friends-hug', 1.71], ['friends-snow', 1.43], ['friends-skating', 0.92], ['friends-dock', 1.8]];
+  const photoHeight = 0.82, photoBorder = 0.07, photoGap = 0.2;
+  const photoWidths = campPhotos.map(([, aspect]) => photoHeight * THREE.MathUtils.clamp(aspect, 0.8, 1.45));
+  let photoX = -(photoWidths.reduce((sum, width) => sum + width + photoBorder * 2, 0) + photoGap * (campPhotos.length - 1)) / 2;
+  campPhotos.forEach(([name, aspect], index) => {
+    const width = photoWidths[index], cardWidth = width + photoBorder * 2, cardHeight = photoHeight + photoBorder + 0.2;
+    const x = photoX + cardWidth / 2; photoX += cardWidth + photoGap;
+    // The pivot sits on the line, so each card sways from its clothespin.
+    const polaroid = new THREE.Group(); polaroid.position.set(x, lineY(x), 2.2); polaroid.userData.tilt = (index % 2 ? 1 : -1) * 0.035; polaroid.rotation.z = polaroid.userData.tilt; campsite.add(polaroid);
+    part(polaroid, new THREE.PlaneGeometry(cardWidth, cardHeight), polaroidPaper, [0, -0.04 - cardHeight / 2, 0]);
+    part(polaroid, new THREE.BoxGeometry(0.06, 0.16, 0.05), pegWood, [0, -0.03, 0.01]);
+    const texture = textureLoader.load(`assets/photos/${name}.jpg`, () => { if (!disposed) render(); });
+    texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); textures.push(texture);
+    // Crop wide pictures to the card's window instead of squashing them.
+    const shown = Math.min(1, (width / photoHeight) / aspect); texture.repeat.set(shown, 1); texture.offset.set((1 - shown) / 2, 0);
+    part(polaroid, new THREE.PlaneGeometry(width, photoHeight), new THREE.MeshBasicMaterial({ map: texture, color: 0xc9c4bd, toneMapped: false }), [0, -0.04 - photoBorder - photoHeight / 2, 0.006]);
+    polaroids.push(polaroid);
+  });
   for (const { group } of stations.values()) group.traverse(object => { if (object.isMesh) pickable.push(object); });
 
   // Low path lights lead from the landing point to each station without blocking walking.
@@ -285,12 +300,170 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
     uniforms: { time: { value: 0 }, pixelRatio: { value: 1 } },
     vertexShader: `attribute float size; attribute float phase; attribute vec3 color; varying vec3 tint; varying float shimmer; uniform float time; uniform float pixelRatio;
-      void main(){ tint=color; shimmer=0.72+0.28*sin(time*0.65+phase); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); gl_PointSize=size*pixelRatio; }`,
+      void main(){ tint=color; shimmer=0.6+0.4*sin(time*(0.7+fract(phase*3.7)*1.9)+phase)*sin(time*0.23+phase*2.0); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); gl_PointSize=size*pixelRatio*(0.8+0.35*shimmer); }`,
     fragmentShader: `varying vec3 tint; varying float shimmer;
       void main(){ vec2 p=gl_PointCoord-.5; float r=length(p); float core=exp(-r*r*36.); float glow=exp(-r*r*9.)*.22; float cross=(exp(-abs(p.x)*70.)*exp(-abs(p.y)*7.)+exp(-abs(p.y)*70.)*exp(-abs(p.x)*7.))*.24; gl_FragColor=vec4(tint,(core+glow+cross)*shimmer*1.5); }`,
   });
   const stars = add(new THREE.Points(starGeometry, starMaterial));
   stars.renderOrder = -1;
+
+  // Everything below keeps the night moving: a crescent moon, an aurora over the
+  // northern ridge, shooting stars, fireflies, a campfire, and fallen stars to collect.
+  const timed = [starMaterial];
+  const skyVertex = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`;
+  const moonDisc = new THREE.Mesh(new THREE.PlaneGeometry(58, 58), new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexShader: skyVertex,
+    fragmentShader: `varying vec2 vUv;
+      void main(){ vec2 p=vUv-.5; float r=length(p)*2.; float disc=smoothstep(.33,.31,r); float bite=smoothstep(.30,.34,length(p-vec2(.075,.045))*2.);
+        float halo=exp(-r*r*6.)*.3; gl_FragColor=vec4(vec3(1.,.93,.8),disc*bite+halo); }`,
+  }));
+  moonDisc.position.set(-0.52, 0.47, -0.71).normalize().multiplyScalar(238); moonDisc.lookAt(0, 0, 0); scene.add(moonDisc);
+
+  const auroraMaterial = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    uniforms: { time: { value: 0 }, intensity: { value: 0.38 } }, vertexShader: skyVertex,
+    fragmentShader: `varying vec2 vUv; uniform float time; uniform float intensity;
+      void main(){ float x=vUv.x; float y=vUv.y-.07*sin(x*17.+time*.21)-.04*sin(x*41.-time*.13);
+        float n=sin(x*31.+time*.33)+sin(x*67.-time*.21+sin(time*.11+x*9.)*2.)*.6+sin(x*11.+time*.14)*.8;
+        float curtain=smoothstep(-.5,1.7,n); float rays=.62+.38*sin(x*390.+sin(x*27.+time*.4)*3.);
+        float body=smoothstep(0.,.1,y)*pow(max(0.,1.-y),1.7); float ends=smoothstep(0.,.14,x)*smoothstep(1.,.86,x);
+        vec3 tint=mix(vec3(.25,1.,.68),vec3(.85,.35,.75),smoothstep(.12,.8,y));
+        gl_FragColor=vec4(tint,curtain*rays*body*ends*intensity); }`,
+  });
+  const aurora = new THREE.Mesh(new THREE.CylinderGeometry(236, 236, 125, 96, 1, true, Math.PI - 1.2, 2.4), auroraMaterial);
+  aurora.position.y = 104; scene.add(aurora); timed.push(auroraMaterial);
+
+  const meteorGeometry = new THREE.PlaneGeometry(1, 1);
+  const meteors = Array.from({ length: 10 }, () => {
+    const material = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      uniforms: { fade: { value: 0 } }, vertexShader: skyVertex,
+      fragmentShader: `varying vec2 vUv; uniform float fade;
+        void main(){ float w=1.-abs(vUv.y-.5)*2.; float tail=pow(vUv.x,3.); float head=exp(-pow((1.-vUv.x)*24.,2.))*1.7;
+          gl_FragColor=vec4(mix(vec3(.7,.82,1.),vec3(1.,.96,.86),vUv.x),(tail*w*w+head*w)*fade); }`,
+    });
+    const mesh = new THREE.Mesh(meteorGeometry, material); mesh.visible = false; mesh.matrixAutoUpdate = false; mesh.frustumCulled = false; scene.add(mesh);
+    return { mesh, material, life: 1, duration: 1, length: 30, from: new THREE.Vector3(), velocity: new THREE.Vector3() };
+  });
+  const meteorX = new THREE.Vector3(), meteorY = new THREE.Vector3(), meteorZ = new THREE.Vector3(), meteorAt = new THREE.Vector3();
+  let nextMeteor = 2.5, showerLeft = 0, showerGap = 0;
+  function launchMeteor(spread = 2.2) {
+    const meteor = meteors.find(item => item.life >= 1); if (!meteor) return;
+    // Most streaks start in the part of the sky the visitor is facing.
+    const azimuth = yaw + Math.PI + (Math.random() - 0.5) * spread, elevation = 0.32 + Math.random() * 0.62;
+    meteor.from.set(Math.sin(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.cos(azimuth) * Math.cos(elevation)).multiplyScalar(232);
+    meteorX.set(0, 1, 0).cross(meteor.from).normalize().multiplyScalar(Math.random() < 0.5 ? -1 : 1);
+    meteorY.set(0, -1, 0).addScaledVector(meteor.from, meteor.from.y / meteor.from.lengthSq()).normalize();
+    meteor.velocity.copy(meteorX).addScaledVector(meteorY, 0.35 + Math.random() * 0.6).normalize().multiplyScalar(130 + Math.random() * 90);
+    meteor.duration = 0.7 + Math.random() * 0.6; meteor.length = 24 + Math.random() * 26; meteor.life = 0; meteor.mesh.visible = true;
+  }
+  function updateMeteors(delta) {
+    nextMeteor -= delta;
+    if (nextMeteor <= 0) { launchMeteor(); nextMeteor = 2.2 + Math.random() * 4.8; }
+    if (showerLeft > 0) { showerGap -= delta; if (showerGap <= 0) { launchMeteor(4.5); showerLeft--; showerGap = 0.07 + Math.random() * 0.16; } }
+    for (const meteor of meteors) {
+      if (meteor.life >= 1) continue;
+      meteor.life = Math.min(1, meteor.life + delta / meteor.duration);
+      if (meteor.life >= 1) { meteor.mesh.visible = false; continue; }
+      meteorAt.copy(meteor.from).addScaledVector(meteor.velocity, meteor.life * meteor.duration);
+      meteorX.copy(meteor.velocity).normalize();
+      meteorZ.copy(meteorAt).normalize().negate(); meteorZ.addScaledVector(meteorX, -meteorZ.dot(meteorX)).normalize();
+      meteorY.crossVectors(meteorZ, meteorX);
+      meteorAt.addScaledVector(meteorX, -meteor.length / 2);
+      meteor.mesh.matrix.makeBasis(meteorX.multiplyScalar(meteor.length), meteorY.multiplyScalar(1.5), meteorZ).setPosition(meteorAt);
+      meteor.mesh.matrixWorldNeedsUpdate = true;
+      meteor.material.uniforms.fade.value = Math.pow(Math.sin(Math.PI * meteor.life), 0.6);
+    }
+  }
+
+  const fireflyPositions = [], fireflyPhases = [];
+  for (let i = 0; i < 150; i++) {
+    const x = (random() - 0.5) * 90, z = -25 + random() * 57;
+    fireflyPositions.push(x, groundHeight(x, z) + 0.35 + random() * 2.2, z); fireflyPhases.push(random() * 20);
+  }
+  const fireflyGeometry = new THREE.BufferGeometry();
+  fireflyGeometry.setAttribute('position', new THREE.Float32BufferAttribute(fireflyPositions, 3));
+  fireflyGeometry.setAttribute('phase', new THREE.Float32BufferAttribute(fireflyPhases, 1));
+  const fireflyMaterial = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { time: { value: 0 }, pixelRatio: { value: 1 } },
+    vertexShader: `attribute float phase; uniform float time; uniform float pixelRatio; varying float glow;
+      void main(){ vec3 p=position; p.x+=sin(time*.31+phase*7.)*1.4; p.z+=cos(time*.27+phase*5.)*1.4; p.y+=sin(time*.5+phase*3.)*.4;
+        glow=smoothstep(.1,1.,sin(time*(.6+fract(phase)*.9)+phase*11.)); vec4 mv=modelViewMatrix*vec4(p,1.);
+        gl_Position=projectionMatrix*mv; gl_PointSize=pixelRatio*(64./max(1.,-mv.z))*(.5+glow); }`,
+    fragmentShader: `varying float glow; void main(){ float r=length(gl_PointCoord-.5); gl_FragColor=vec4(1.,.84,.5,exp(-r*r*24.)*glow*.9); }`,
+  });
+  const fireflies = new THREE.Points(fireflyGeometry, fireflyMaterial); fireflies.frustumCulled = false; scene.add(fireflies); timed.push(fireflyMaterial);
+
+  // A campfire beside the tent, so the camp reads as lived-in from across the valley.
+  const fire = new THREE.Group(); fire.position.set(27.6, groundHeight(27.6, -3.8), -3.8); scene.add(fire);
+  for (let i = 0; i < 9; i++) {
+    const angle = i / 9 * Math.PI * 2, stone = part(fire, rockGeometry, new THREE.MeshStandardMaterial({ color: 0x6d6262, roughness: 1, flatShading: true }), [Math.sin(angle) * 0.66, 0.06, Math.cos(angle) * 0.66]);
+    stone.scale.set(0.2, 0.13, 0.17); stone.rotation.y = angle * 2.3;
+  }
+  const logMaterial = new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: 1 });
+  for (let i = 0; i < 3; i++) { const angle = i * Math.PI / 3; beam(fire, [Math.sin(angle) * 0.48, 0.08, Math.cos(angle) * 0.48], [-Math.sin(angle) * 0.48, 0.2, -Math.cos(angle) * 0.48], 0.075, logMaterial); }
+  const flames = [[0xff4d1a, 0.34, 1.0], [0xff9a2e, 0.24, 0.78], [0xffe39a, 0.13, 0.5]].map(([color, radius, tall]) => {
+    const flame = part(fire, new THREE.ConeGeometry(radius, tall, 7, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), [0, 0.15 + tall / 2, 0]);
+    flame.userData.tall = tall; return flame;
+  });
+  const fireLight = new THREE.PointLight(0xff7a33, 170, 24, 2); fireLight.position.y = 1; fire.add(fireLight);
+  const sparkPositions = [], sparkPhases = [];
+  for (let i = 0; i < 46; i++) { sparkPositions.push((random() - 0.5) * 0.4, 0.4, (random() - 0.5) * 0.4); sparkPhases.push(random()); }
+  const sparkGeometry = new THREE.BufferGeometry();
+  sparkGeometry.setAttribute('position', new THREE.Float32BufferAttribute(sparkPositions, 3));
+  sparkGeometry.setAttribute('phase', new THREE.Float32BufferAttribute(sparkPhases, 1));
+  const sparkMaterial = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { time: { value: 0 }, pixelRatio: { value: 1 } },
+    vertexShader: `attribute float phase; uniform float time; uniform float pixelRatio; varying float life;
+      void main(){ life=fract(time*.2+phase); vec3 p=position; p.y+=life*4.; p.x+=sin(phase*40.+life*6.)*.45*life; p.z+=cos(phase*31.+life*5.)*.45*life;
+        vec4 mv=modelViewMatrix*vec4(p,1.); gl_Position=projectionMatrix*mv; gl_PointSize=pixelRatio*(30./max(1.,-mv.z))*(1.-life*.6); }`,
+    fragmentShader: `varying float life; void main(){ float r=length(gl_PointCoord-.5); gl_FragColor=vec4(1.,.56,.2,exp(-r*r*20.)*(1.-life)); }`,
+  });
+  const sparks = new THREE.Points(sparkGeometry, sparkMaterial); sparks.frustumCulled = false; fire.add(sparks); timed.push(sparkMaterial);
+
+  // Fallen stars: each one sends up a thin column of light so it can be spotted from far away.
+  const glowCanvas = document.createElement('canvas'); glowCanvas.width = glowCanvas.height = 128;
+  const glowContext = glowCanvas.getContext('2d');
+  if (glowContext) {
+    const gradient = glowContext.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0, 'rgba(255,240,210,1)'); gradient.addColorStop(0.25, 'rgba(255,214,150,.5)'); gradient.addColorStop(1, 'rgba(255,190,120,0)');
+    glowContext.fillStyle = gradient; glowContext.fillRect(0, 0, 128, 128);
+  }
+  const glowTexture = new THREE.CanvasTexture(glowCanvas); textures.push(glowTexture);
+  const glowMaterial = new THREE.SpriteMaterial({ map: glowTexture, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+  const shardGeometry = new THREE.OctahedronGeometry(0.32, 0);
+  const shardMaterial = new THREE.MeshStandardMaterial({ color: 0xfff3d6, emissive: 0xffd49a, emissiveIntensity: 2.6, roughness: 0.3, flatShading: true });
+  const columnGeometry = new THREE.CylinderGeometry(0.04, 0.2, 18, 8, 1, true);
+  const columnMaterial = new THREE.MeshBasicMaterial({ color: 0xffe2b0, transparent: true, opacity: 0.17, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const shards = [[3, 13], [-25, 22], [-30, -4], [-18, -19], [-1, -22], [36, -19], [31, 15]].map(([x, z], index) => {
+    const group = new THREE.Group(), baseY = groundHeight(x, z) + 1.05; group.position.set(x, baseY, z); scene.add(group);
+    const gem = part(group, shardGeometry, shardMaterial); gem.scale.set(0.8, 1.3, 0.8);
+    part(group, columnGeometry, columnMaterial, [0, 9, 0]);
+    const glow = new THREE.Sprite(glowMaterial); glow.scale.setScalar(2.4); group.add(glow);
+    return { group, gem, x, z, baseY, phase: index * 0.9, collected: false };
+  });
+  let collected = 0;
+  function updateWorld(delta) {
+    if (!paused) {
+      updateMeteors(delta);
+      flames.forEach((flame, index) => {
+        flame.scale.y = 1 + Math.sin(clock * 9 + index * 2) * 0.16 + Math.sin(clock * 23 + index) * 0.08;
+        flame.scale.x = flame.scale.z = 1 + Math.sin(clock * 13 + index * 3) * 0.1;
+        flame.position.y = 0.15 + flame.userData.tall * flame.scale.y / 2; flame.rotation.y = clock * (1.5 + index);
+      });
+      fireLight.intensity = 165 + Math.sin(clock * 11) * 26 + Math.sin(clock * 27) * 14;
+      polaroids.forEach((polaroid, index) => { polaroid.rotation.z = polaroid.userData.tilt + Math.sin(clock * 0.9 + index * 1.7) * 0.035; });
+    }
+    for (const shard of shards) {
+      if (shard.collected) continue;
+      if (!paused) { shard.gem.rotation.y = clock * 1.1 + shard.phase; shard.group.position.y = shard.baseY + Math.sin(clock * 1.6 + shard.phase) * 0.14; }
+      if (active && Math.hypot(camera.position.x - shard.x, camera.position.z - shard.z) < 1.9) {
+        shard.collected = true; shard.group.visible = false; collected++;
+        launchMeteor(0.8); onCollect({ count: collected, total: shards.length });
+        if (collected === shards.length) auroraMaterial.uniforms.intensity.value = 0.62;
+      }
+    }
+  }
 
   const keys = new Set();
   let externalForward = 0, externalStrafe = 0, yaw = 0, pitch = 0;
@@ -311,6 +484,11 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     obstacles: [...stations.values()].map(({ group }) => ({ x: group.position.x, z: group.position.z, radius: 3 })),
   });
   companions.update({ position: camera.position, yaw, delta: 0, time: clock, moving: false, paused: true });
+  // The dog is small, so a generous unseen sphere makes him easy to select.
+  const dogPick = new THREE.Mesh(new THREE.SphereGeometry(1.25, 10, 8), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+  dogPick.position.y = 0.95; companions.dog.add(dogPick);
+  const dogAnchor = new THREE.Vector3();
+  const dogDistance = () => Math.hypot(camera.position.x - companions.dog.position.x, camera.position.z - companions.dog.position.z);
   function projectStations() {
     const data = [];
     for (const station of stations.values()) {
@@ -319,10 +497,19 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
       data.push({ id: station.id, x: (projection.x + 1) * width / 2, y: (1 - projection.y) * height / 2,
         distance, visible: projection.z > -1 && projection.z < 1 && Math.abs(projection.x) < 0.96 && Math.abs(projection.y) < 0.90 && distance < 60 });
     }
+    projection.copy(dogAnchor.copy(companions.dog.position).setY(companions.dog.position.y + 1.55)).project(camera);
+    data.push({ id: 'wanderer', x: (projection.x + 1) * width / 2, y: (1 - projection.y) * height / 2, distance: dogDistance(),
+      visible: projection.z > -1 && projection.z < 1 && Math.abs(projection.x) < 0.96 && Math.abs(projection.y) < 0.90 && dogDistance() < 32 });
     onProject(data);
     const state = getPlayerState(); onLocation(state); onUpdate(state);
   }
-  function getPlayerState() { return { x: camera.position.x, z: camera.position.z, yaw, heading: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearest: nearestStation()?.id || null }; }
+  function getPlayerState() { return { x: camera.position.x, z: camera.position.z, yaw, heading: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearest: nearestTarget() }; }
+  function nearestTarget() {
+    const station = nearestStation(); if (station) return station.id;
+    const dx = companions.dog.position.x - camera.position.x, dz = companions.dog.position.z - camera.position.z, d = Math.hypot(dx, dz);
+    camera.getWorldDirection(cameraDirection);
+    return d < 5.5 && (dx * cameraDirection.x + dz * cameraDirection.z) / Math.max(d, 0.001) > 0.25 ? 'wanderer' : null;
+  }
   function nearestStation() {
     let nearest = null, distance = 7;
     camera.getWorldDirection(cameraDirection);
@@ -335,7 +522,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
   }
   function render() {
     if (!contextAvailable || disposed) return;
-    starMaterial.uniforms.time.value = clock;
+    for (const material of timed) material.uniforms.time.value = clock;
     renderer.render(scene, camera);
     projectStations();
   }
@@ -375,6 +562,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
       if (t === 1) travel = null;
       changed = true;
     }
+    updateWorld(delta);
     const companionChanged = companions.update({ position: camera.position, yaw, delta, time: clock, moving: changed, paused: paused || !active });
     orient();
     if (!paused || changed || companionChanged || time - lastProjection > 500) { render(); lastProjection = time; }
@@ -389,7 +577,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     const ratio = Math.min(devicePixelRatio || 1, width < 700 ? 1.35 : 1.75);
     renderer.setPixelRatio(ratio); renderer.setSize(width, height, false);
     camera.aspect = width / height; camera.fov = width < 700 ? 70 : 62; camera.updateProjectionMatrix();
-    starMaterial.uniforms.pixelRatio.value = ratio;
+    for (const material of timed) if (material.uniforms.pixelRatio) material.uniforms.pixelRatio.value = ratio;
     render();
   }
   function look(dx, dy) {
@@ -416,6 +604,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     if (moved || event.type === 'pointercancel') return;
     const rect = canvas.getBoundingClientRect(); mouse.set((event.clientX - rect.left) / width * 2 - 1, -(event.clientY - rect.top) / height * 2 + 1);
     raycaster.setFromCamera(mouse, camera);
+    if (raycaster.intersectObject(dogPick, false).some(hit => hit.distance < 22)) { onSelect('wanderer'); return; }
     const hit = raycaster.intersectObjects(pickable, false).find(hit => hit.distance < 9);
     if (hit) {
       let group = hit.object; while (group && !group.userData.station) group = group.parent;
@@ -427,7 +616,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     if (!active || document.querySelector('dialog[open]') || event.altKey || event.ctrlKey || event.metaKey || event.target.closest?.('input,textarea,select,[contenteditable],dialog[open],button,a')) return;
     const key = event.key.toLowerCase();
     if (movementKeys.has(key)) { event.preventDefault(); keys.add(key); }
-    else if (key === 'e' && !event.repeat) { const nearest = nearestStation(); if (nearest) onSelect(nearest.id); }
+    else if (key === 'e' && !event.repeat) { const nearest = nearestTarget(); if (nearest) onSelect(nearest); }
   }
   function keyUp(event) { keys.delete(event.key.toLowerCase()); }
   function clearMovement() { keys.clear(); externalForward = 0; externalStrafe = 0; drag = null; }
@@ -450,7 +639,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     goTo(id) {
       const station = stations.get(id); if (!station) return;
       clearMovement();
-      const to = new THREE.Vector3(station.group.position.x, 0, Math.min(29, station.group.position.z + 6.5));
+      const to = new THREE.Vector3(station.group.position.x, 0, Math.min(29, station.group.position.z + (id === 'life' ? 9 : 6.5)));
       to.y = groundHeight(to.x, to.z) + eyeHeight;
       const direction = station.anchor.clone().sub(to);
       const toYaw = Math.atan2(-direction.x, -direction.z);
@@ -460,6 +649,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
       else travel = { from: camera.position.clone(), to, fromYaw: yaw, yawDelta, fromPitch: pitch, toPitch, elapsed: 0, duration: clamp(camera.position.distanceTo(to) / 12, 0.7, 3.5) };
     },
     reset() { clearMovement(); resetPosition(); render(); },
+    meteorShower(count = 36) { showerLeft = count; showerGap = 0; },
     dispose() {
       disposed = true; if (frame) cancelAnimationFrame(frame);
       observer.disconnect(); resizeObserver.disconnect();
@@ -469,7 +659,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
       companions.dispose();
       const geometries = new Set(), materials = new Set();
       scene.traverse(object => { if (object.geometry) geometries.add(object.geometry); if (Array.isArray(object.material)) object.material.forEach(material => materials.add(material)); else if (object.material) materials.add(object.material); });
-      geometries.forEach(geometry => geometry.dispose()); materials.forEach(material => material.dispose()); grainTexture?.dispose(); renderer.dispose();
+      geometries.forEach(geometry => geometry.dispose()); materials.forEach(material => material.dispose()); grainTexture?.dispose(); textures.forEach(texture => texture.dispose()); renderer.dispose();
     },
   };
 }

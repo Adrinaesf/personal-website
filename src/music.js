@@ -79,5 +79,5 @@ export function initMusic(button, status) {
   });
   paint();
   void play();
-  return { start() { if (enabled) { stopFade(); void play(); } } };
+  return { isOn: () => enabled, start() { if (enabled) { stopFade(); void play(); } } };
 }

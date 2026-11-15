@@ -1,18 +1,21 @@
 # Adrina Esfandiari — Personal Website
 
-A personal portfolio you explore as a first-person game. Walk through a red-lit, rocky mountain landscape beneath a star-filled sky, discover Adrina’s projects and research, and visit a campsite with notes about her life and interests.
+A personal portfolio you explore as a first-person game. Walk through a red-lit, rocky mountain landscape beneath a moving night sky, open a paper field journal at each landmark, collect fallen stars, and meet the dog who wanders the valley.
 
 ![The mountain world and game interface](docs/preview.jpg)
 
-[Open the website](https://adrina-esfandiari-observatory.festivesloth3.chatgpt.site) — the current deployment is private and requires the owner’s access.
+**[Open the website → adrinaesf.github.io/personal-website](https://adrinaesf.github.io/personal-website/)**
 
 ## Features
 
-- **An explorable 3D world:** procedural mountains, a surrounding night sky, textured terrain, and 1,600 instanced stones.
+- **An explorable 3D world:** procedural mountains, textured terrain, and 1,600 instanced stones.
+- **A living sky:** twinkling stars, shooting stars, a crescent moon, an aurora over the northern ridge, fireflies, and a campfire.
 - **Five discoverable locations:** Base camp, Project archive, Observatory, Radio station, and My life.
+- **Seven fallen stars to collect:** each sends up a column of light; finding all seven starts a meteor shower.
+- **A scrapbook interface:** journals open as paper pages with taped polaroids, and every control is a hand-drawn paper tag.
 - **Game navigation:** walking, drag-to-look, illuminated paths, a compass, destination tabs, a map, and a return-to-camp control.
-- **A roaming companion:** a small African wild dog that walks, pauses, sniffs, avoids landmarks, and catches up when the visitor moves away.
-- **A personal journal:** resume-backed projects and experience, plus hiking, friends, hackathons, animals, and robotics interests. Photo spaces are prepared; personal photographs have not been added yet.
+- **A roaming guide:** a small dog that introduces the world, then walks, pauses, sniffs, avoids landmarks, and catches up when the visitor moves away. Selecting him opens the story of the real dog by the river who inspired him.
+- **A personal journal:** resume-backed projects and experience, plus hiking, friends, hackathons, animals, and robotics interests, with Adrina’s own photographs. Four of them also hang as polaroids on a line at the campsite.
 - **Music controls:** the supplied soundtrack is enabled by default, with an Off button, fades, looping, and background pause. If the browser blocks autoplay, selecting Enter starts playback.
 - **Accessible alternatives:** keyboard and touch controls, reduced-motion support, readable journals, and direct journal access through the map when WebGL is unavailable.
 
@@ -40,7 +43,8 @@ Open [localhost:4173](http://localhost:4173). After changing JavaScript, run `pn
 | --- | --- |
 | Walk | W / A / S / D or arrow keys |
 | Look around | Drag the landscape |
-| Inspect a nearby landmark | E or select its marker |
+| Open a nearby landmark, or meet the dog | E or select its marker |
+| Collect a fallen star | Walk into it |
 | Travel to a location | Map or a journal destination tab |
 | Reopen a discovered journal | Select its journal tab |
 | Close a journal or menu | Escape or its close button |
@@ -68,12 +72,13 @@ dist/
     style.css           Authored styling and typography
     app.js              Generated JavaScript bundle
     star.svg            Favicon
+    photos/               Web-sized photographs, metadata removed
     Adrina-Esfandiari-Resume.pdf
     wind-song.mp3
 docs/
   preview.jpg           Interface screenshot
-.openai/
-  hosting.json          Existing Sites deployment configuration
+.github/workflows/
+  pages.yml             Publishes dist/ to GitHub Pages
 ```
 
 `dist/index.html` and `dist/assets/style.css` are edited directly. The build command only regenerates `dist/assets/app.js`; it does not replace the HTML, CSS, or media. The repository includes the complete static output as well as its JavaScript source.
@@ -81,11 +86,12 @@ docs/
 ## Edit content and media
 
 - **Projects, research, biography, and contact:** edit the `content-*` templates in `dist/index.html`.
-- **Personal stories and photographs:** edit `content-life`. The hidden `memory-photo` figures mark places for hiking, friends, hackathon, and everyday pictures. Add images under `dist/assets/`, insert an image with meaningful alt text and an optional caption, and remove the figure’s `hidden` attribute.
-- **Physical photo frames:** the campsite models are created in `src/scene.js`; they currently contain no personal photographs.
+- **Personal stories and photographs:** edit `content-life` and `content-wanderer`. Each photograph is a `<figure class="polaroid">`. Add images under `dist/assets/photos/` (resize them and strip location metadata first), with meaningful alt text and a caption.
+- **Polaroids at the campsite:** the `campPhotos` list in `src/scene.js` names each picture and its width-to-height ratio.
+- **The dog’s introduction:** the lines he says are in the Enter handler in `src/main.js`.
 - **Resume:** replace `dist/assets/Adrina-Esfandiari-Resume.pdf` and update the journal content when needed.
 - **Audio:** replace `dist/assets/wind-song.mp3`, then update its credit in `dist/index.html` and playback announcements in `src/music.js`.
-- **Appearance:** edit `dist/assets/style.css`. Controls use Kalam, journal headings use Lora, and body text uses DM Sans, with system fallbacks.
+- **Appearance:** edit `dist/assets/style.css`. Headings and controls use Kalam, journal text uses Lora, and small labels use DM Sans, with system fallbacks.
 
 ## Validation
 
@@ -99,14 +105,15 @@ The six regression tests cover overlapping player/landmark exclusions, paused ca
 
 ## Deployment
 
-Build the project and serve the entire `dist/` directory from a static host. Serve it over HTTP or HTTPS rather than opening `index.html` directly.
+The site is published with GitHub Pages. Every push to `main` runs `.github/workflows/pages.yml`, which uploads the committed `dist/` directory as it is. Run `pnpm build` and commit the regenerated `dist/assets/app.js` before pushing JavaScript changes.
 
-The existing private Sites deployment uses `.openai/hosting.json`, which points to `dist/`. Pushing to this GitHub repository does not automatically update that deployment. The GitHub repository and the live website have separate access settings.
+Any other static host also works: serve the entire `dist/` directory over HTTP or HTTPS rather than opening `index.html` directly.
 
 ## Credits and content notes
 
 - Portfolio content and resume: Adrina Esfandiari.
 - Soundtrack: **Wind Song — Ludovico Einaudi**, supplied by Adrina.
+- Photographs: Adrina Esfandiari.
 - The landscape, dog, destination icons, and terrain texture are generated locally from project code; there are no downloaded 3D models.
 - Fonts load from Google Fonts, with local system fallbacks.
 - PrintOpti’s reported prediction improvement concerns held-out slicer-generated estimates, rather than measured physical print performance.

@@ -102,6 +102,7 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
 
   const target = new THREE.Vector3();
   let initialized = false, gait = 0, waiting = 1.5, catchingUp = false, travelTime = 0, side = 1, holdSide = 0, checkTime = 0, checkX = 0, checkZ = 0, headingX = 0, headingZ = 0;
+  let greeting = null, orbit = 0, orbitLeft = 0, orbitDirection = 1, sitTime = 0, sit = 0, goalGap = 0, greetCheck = 0, greetX = 0, greetZ = 0, settleTime = 0;
   const clamp = THREE.MathUtils.clamp;
   // Everything the dog keeps clear of: the visitor first, then each landmark with a margin.
   const playerDisc = { x: 0, z: 0, radius: 3.2 };
@@ -172,45 +173,85 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
     }
     if (paused) return true;
     const oldX = dog.position.x, oldZ = dog.position.z;
-    const playerDistance = Math.hypot(dog.position.x - position.x, dog.position.z - position.z);
-    if (playerDistance > 18) catchingUp = true;
-    if (catchingUp) {
-      const point = safePoint(position.x + forwardX * 5 + rightX * 3, position.z + forwardZ * 5 + rightZ * 3, position);
-      target.set(point.x, 0, point.z); waiting = 0;
-      if (playerDistance < 9) { catchingUp = false; waiting = 1 + random() * 2; }
-    } else {
-      if (waiting > 0) {
-        waiting -= delta;
-        if (waiting <= 0) selectWanderTarget(position);
-      } else if (Math.hypot(target.x - dog.position.x, target.z - dog.position.z) < .35) waiting = 1.5 + random() * 3.5;
-      // Give up on a spot that turned out to be awkward to reach, and rest instead.
-      else if ((travelTime += delta) > 8) waiting = .8 + random() * 1.5;
-    }
-    playerDisc.x = position.x; playerDisc.z = position.z;
-    if (waiting <= 0) {
-      let dx = target.x - dog.position.x, dz = target.z - dog.position.z;
-      const distance = Math.hypot(dx, dz);
-      if (distance > .001) {
-        dx /= distance; dz /= distance;
-        // When something stands between the dog and where he is going, he walks
-        // around its edge and keeps to the same side until the way is clear.
-        for (const disc of discs) {
-          const cx = disc.x - dog.position.x, cz = disc.z - dog.position.z, d = Math.hypot(cx, cz);
-          const along = clamp(cx * dx + cz * dz, 0, distance);
-          if (d < .0001 || d > disc.radius + 1.2 || Math.hypot(cx - dx * along, cz - dz * along) >= disc.radius - .05) continue;
-          const nx = cx / d, nz = cz / d, into = dx * nx + dz * nz;
-          let tx = dx - nx * into, tz = dz - nz * into;
-          const tangent = Math.hypot(tx, tz);
-          if (tangent < .2 || holdSide > 0) { tx = -nz * side; tz = nx * side; }
-          else { tx /= tangent; tz /= tangent; side = tx * -nz + tz * nx >= 0 ? 1 : -1; }
-          // Lean slightly outward so the walk hugs the edge without touching it.
-          const lean = d < disc.radius + .25 ? .25 : 0;
-          dx = tx - nx * lean; dz = tz - nz * lean;
-          const length = Math.hypot(dx, dz); dx /= length; dz /= length;
-          break;
+    if (greeting) {
+      // Saying hi: run up, trot a circle around the visitor, then sit in front of them.
+      const ring = 5.2, away = Math.atan2(dog.position.x - position.x, dog.position.z - position.z);
+      waiting = 1; catchingUp = false;
+      if (greeting === 'approach') {
+        orbit = away;
+        if (Math.abs(Math.hypot(dog.position.x - position.x, dog.position.z - position.z) - ring) < .5) {
+          // Finish in front of the visitor after at least half a turn.
+          const front = Math.atan2(forwardX, forwardZ);
+          orbitLeft = ((front - orbit) * orbitDirection % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+          if (orbitLeft < Math.PI) orbitLeft += Math.PI * 2;
+          greeting = 'circle';
         }
-        const step = Math.min(distance, (catchingUp ? 8 : 2.6) * delta);
-        dog.position.x += dx * step; dog.position.z += dz * step;
+      } else if (greeting === 'circle') {
+        // The spot he is heading for only moves on once he has nearly reached it,
+        // so a wall or a landmark in the way bends the circle instead of losing him.
+        if (goalGap < 1.6) { const turn = Math.min(orbitLeft, 1.7 * delta); orbit += turn * orbitDirection; orbitLeft -= turn; }
+        if (orbitLeft <= 0) greeting = 'settle';
+        // With no room to get past (the visitor is against the edge of the valley),
+        // he gives up the lap and simply comes round to the front.
+        if ((greetCheck += delta) > .7) {
+          if (Math.hypot(dog.position.x - greetX, dog.position.z - greetZ) < .5) greeting = 'settle';
+          greetCheck = 0; greetX = dog.position.x; greetZ = dog.position.z;
+        }
+      } else if (greeting === 'settle') {
+        orbit = Math.atan2(forwardX, forwardZ);
+        // If the front cannot be reached, he sits wherever he got to.
+        if (goalGap < .35 || (settleTime += delta) > 2.5) { greeting = 'sit'; sitTime = 9; }
+      } else if ((sitTime -= delta) <= 0 || Math.hypot(dog.position.x - position.x, dog.position.z - position.z) > 9) {
+        greeting = null; waiting = .6;
+      }
+      if (greeting && greeting !== 'sit') {
+        const goal = safePoint(position.x + Math.sin(orbit) * ring, position.z + Math.cos(orbit) * ring, position);
+        const gx = goal.x - dog.position.x, gz = goal.z - dog.position.z;
+        goalGap = Math.hypot(gx, gz);
+        const step = Math.min(goalGap, 9.5 * delta);
+        if (goalGap > .001) { dog.position.x += gx / goalGap * step; dog.position.z += gz / goalGap * step; }
+      }
+    } else {
+      const playerDistance = Math.hypot(dog.position.x - position.x, dog.position.z - position.z);
+      if (playerDistance > 18) catchingUp = true;
+      if (catchingUp) {
+        const point = safePoint(position.x + forwardX * 5 + rightX * 3, position.z + forwardZ * 5 + rightZ * 3, position);
+        target.set(point.x, 0, point.z); waiting = 0;
+        if (playerDistance < 9) { catchingUp = false; waiting = 1 + random() * 2; }
+      } else {
+        if (waiting > 0) {
+          waiting -= delta;
+          if (waiting <= 0) selectWanderTarget(position);
+        } else if (Math.hypot(target.x - dog.position.x, target.z - dog.position.z) < .35) waiting = 1.5 + random() * 3.5;
+        // Give up on a spot that turned out to be awkward to reach, and rest instead.
+        else if ((travelTime += delta) > 8) waiting = .8 + random() * 1.5;
+      }
+      playerDisc.x = position.x; playerDisc.z = position.z;
+      if (waiting <= 0) {
+        let dx = target.x - dog.position.x, dz = target.z - dog.position.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance > .001) {
+          dx /= distance; dz /= distance;
+          // When something stands between the dog and where he is going, he walks
+          // around its edge and keeps to the same side until the way is clear.
+          for (const disc of discs) {
+            const cx = disc.x - dog.position.x, cz = disc.z - dog.position.z, d = Math.hypot(cx, cz);
+            const along = clamp(cx * dx + cz * dz, 0, distance);
+            if (d < .0001 || d > disc.radius + 1.2 || Math.hypot(cx - dx * along, cz - dz * along) >= disc.radius - .05) continue;
+            const nx = cx / d, nz = cz / d, into = dx * nx + dz * nz;
+            let tx = dx - nx * into, tz = dz - nz * into;
+            const tangent = Math.hypot(tx, tz);
+            if (tangent < .2 || holdSide > 0) { tx = -nz * side; tz = nx * side; }
+            else { tx /= tangent; tz /= tangent; side = tx * -nz + tz * nx >= 0 ? 1 : -1; }
+            // Lean slightly outward so the walk hugs the edge without touching it.
+            const lean = d < disc.radius + .25 ? .25 : 0;
+            dx = tx - nx * lean; dz = tz - nz * lean;
+            const length = Math.hypot(dx, dz); dx /= length; dz /= length;
+            break;
+          }
+          const step = Math.min(distance, (catchingUp ? 8 : 2.6) * delta);
+          dog.position.x += dx * step; dog.position.z += dz * step;
+        }
       }
     }
     // Pinched between the visitor and a landmark, he would pace on the spot.
@@ -237,17 +278,29 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
       const targetYaw = Math.atan2(-headingX, -headingZ);
       dog.rotation.y += Math.atan2(Math.sin(targetYaw - dog.rotation.y), Math.cos(targetYaw - dog.rotation.y)) * Math.min(1, delta * 5);
     }
-    if (travelling) gait += delta * (catchingUp ? 14 : 10);
-    const amplitude = travelling ? .48 : 0;
+    if (greeting === 'sit' && !travelling) {
+      const faceYaw = Math.atan2(dog.position.x - position.x, dog.position.z - position.z);
+      dog.rotation.y += Math.atan2(Math.sin(faceYaw - dog.rotation.y), Math.cos(faceYaw - dog.rotation.y)) * Math.min(1, delta * 8);
+    }
+    sit += ((greeting === 'sit' && !travelling ? 1 : 0) - sit) * Math.min(1, delta * 6);
+    if (travelling) gait += delta * (catchingUp || greeting ? 14 : 10);
+    const amplitude = (travelling ? .48 : 0) * (1 - sit);
     for (const leg of legs) {
       const phase = gait + (leg.front === (leg.side === 1) ? 0 : Math.PI);
-      leg.hip.rotation.x = Math.sin(phase) * amplitude;
-      leg.shin.rotation.x = Math.max(0, -Math.sin(phase)) * amplitude * .8;
+      // Sitting folds the hind legs under him and drops his hips to the ground.
+      leg.hip.rotation.x = Math.sin(phase) * amplitude + (leg.front ? -.12 : 1.25) * sit;
+      leg.shin.rotation.x = Math.max(0, -Math.sin(phase)) * amplitude * .8 + (leg.front ? 0 : -2.0) * sit;
+      leg.hip.position.y = .85 - (leg.front ? 0 : .4) * sit;
+      if (leg.front) leg.hip.position.z = -.36 + .09 * sit;
     }
-    dogBody.position.y = travelling ? Math.cos(gait * 2) * .014 : Math.sin(time * 1.3) * .003;
-    head.rotation.x = travelling ? 0 : .18 + Math.sin(time * 1.7) * .08;
-    head.rotation.y = Math.sin(time * .65) * .13;
-    tail.rotation.y = Math.sin(time * (travelling ? 4 : 1.7)) * .2;
+    dogBody.rotation.x = .5 * sit;
+    dogBody.position.y = (travelling ? Math.cos(gait * 2) * .014 : Math.sin(time * 1.3) * .003) - .1 * sit;
+    dogBody.position.z = -.39 * sit;
+    // While sitting he looks up at the visitor and wags hard.
+    head.rotation.x = (travelling ? 0 : .18 + Math.sin(time * 1.7) * .08) * (1 - sit) - .22 * sit;
+    head.rotation.y = Math.sin(time * .65) * .13 * (1 - sit) + Math.sin(time * 1.1) * .1 * sit;
+    tail.position.y = 1.01 - .5 * sit; tail.rotation.x = -.5 * sit;
+    tail.rotation.y = Math.sin(time * (travelling ? 4 : 1.7 + sit * 9)) * (.2 + sit * .35);
     return true;
   }
   function dispose() {
@@ -255,5 +308,9 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
     dog.traverse(object => { if (object.geometry) geometries.add(object.geometry); if (object.material) materials.add(object.material); });
     scene.remove(dog); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); coatMap.dispose();
   }
-  return { dog, update, dispose };
+  function greet() {
+    if (greeting) return;
+    greeting = 'approach'; settleTime = 0; goalGap = 0; greetCheck = 0; greetX = dog.position.x; greetZ = dog.position.z; orbitDirection = random() < .5 ? -1 : 1;
+  }
+  return { dog, update, dispose, greet, isSitting: () => greeting === 'sit' && sit > .85 };
 }

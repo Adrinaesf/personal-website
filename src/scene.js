@@ -553,6 +553,19 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     const state = getPlayerState(); onLocation(state); onUpdate(state);
   }
   function getPlayerState() { return { x: camera.position.x, z: camera.position.z, yaw, heading: ((-yaw * 180 / Math.PI) % 360 + 360) % 360, nearest: nearestTarget() }; }
+  // Saying hi brings River over: he circles the visitor and sits, and only then does his page open.
+  let hiPending = -1;
+  function sayHi() {
+    if (hiPending >= 0) return;
+    if (paused || companions.isSitting()) { onSelect('wanderer'); return; }
+    companions.greet(); hiPending = 0;
+  }
+  function updateHi(delta) {
+    if (hiPending < 0) return;
+    hiPending += delta;
+    if (companions.isSitting() ? hiPending > 0 && (hiSat += delta) > 1.6 : hiPending > 9) { hiPending = -1; hiSat = 0; onSelect('wanderer'); }
+  }
+  let hiSat = 0;
   function nearestTarget() {
     const station = nearestStation(); if (station) return station.id;
     const dx = companions.dog.position.x - camera.position.x, dz = companions.dog.position.z - camera.position.z, d = Math.hypot(dx, dz);
@@ -611,7 +624,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
       if (t === 1) travel = null;
       changed = true;
     }
-    updateWorld(delta);
+    updateWorld(delta); updateHi(delta);
     const companionChanged = companions.update({ position: camera.position, yaw, delta, time: clock, moving: changed, paused: paused || !active });
     orient();
     if (!paused || changed || companionChanged || time - lastProjection > 500) { render(); lastProjection = time; }
@@ -654,7 +667,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     if (moved || event.type === 'pointercancel') return;
     const rect = canvas.getBoundingClientRect(); mouse.set((event.clientX - rect.left) / width * 2 - 1, -(event.clientY - rect.top) / height * 2 + 1);
     raycaster.setFromCamera(mouse, camera);
-    if (raycaster.intersectObject(dogPick, false).some(hit => hit.distance < 22)) { onSelect('wanderer'); return; }
+    if (raycaster.intersectObject(dogPick, false).some(hit => hit.distance < 22)) { sayHi(); return; }
     const hit = raycaster.intersectObjects(pickable, false).find(hit => hit.distance < 9);
     if (hit) {
       let group = hit.object; while (group && !group.userData.station) group = group.parent;
@@ -666,7 +679,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     if (!active || document.querySelector('dialog[open]') || event.altKey || event.ctrlKey || event.metaKey || event.target.closest?.('input,textarea,select,[contenteditable],dialog[open],button,a')) return;
     const key = event.key.toLowerCase();
     if (movementKeys.has(key)) { event.preventDefault(); keys.add(key); }
-    else if (key === 'e' && !event.repeat) { const nearest = nearestTarget(); if (nearest) onSelect(nearest); }
+    else if (key === 'e' && !event.repeat) { const nearest = nearestTarget(); if (nearest === 'wanderer') sayHi(); else if (nearest) onSelect(nearest); }
   }
   function keyUp(event) { keys.delete(event.key.toLowerCase()); }
   function clearMovement() { keys.clear(); externalForward = 0; externalStrafe = 0; drag = null; }
@@ -700,6 +713,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     },
     reset() { clearMovement(); resetPosition(); render(); },
     meteorShower(count = 36) { showerLeft = count; showerGap = 0; },
+    sayHi,
     dispose() {
       disposed = true; if (frame) cancelAnimationFrame(frame);
       observer.disconnect(); resizeObserver.disconnect();

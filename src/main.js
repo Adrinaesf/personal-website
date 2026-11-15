@@ -81,7 +81,7 @@ function onCollect({ count, total: stars }) {
     showToast('✦ All seven. Look up!');
     for (let step = 0; step < 7; step++) setTimeout(() => chime(step), 250 + step * 120);
     document.body.classList.add('celebrating'); setTimeout(() => document.body.classList.remove('celebrating'), 3000);
-    say('That’s all seven. Look up.', 'Every star is out for you tonight. And look down: the mist is rolling in.');
+    say('That’s all seven. Look up.', 'Every star you picked up is back in the sky now, shining for you.', 'Keep looking for the little lights in your own life too. They’re always out there.');
   }
 }
 
@@ -119,7 +119,8 @@ for (const [id, name] of Object.entries(names)) {
   el.innerHTML = `<span class="marker-name">${id === 'wanderer' ? 'say hi' : name}</span><span class="marker-distance"></span><span class="marker-pin" aria-hidden="true"></span>`;
   el.setAttribute('aria-label', `Inspect ${name}`);
   el.addEventListener('click', () => {
-    if (id !== 'wanderer' && Number(el.dataset.distance) > 9) {
+    if (id === 'wanderer' && scene) scene.sayHi();
+    else if (Number(el.dataset.distance) > 9) {
       scene?.goTo(id);
       $('#landscape').focus();
     }

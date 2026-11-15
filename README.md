@@ -2,7 +2,7 @@
 
 A personal portfolio you explore as a first-person game. Walk through a red-lit, rocky mountain landscape beneath a moving night sky, open a paper field journal at each landmark, collect fallen stars, and meet the dog who wanders the valley.
 
-![The mountain world and game interface](docs/preview.jpg)
+![The mountain world and game interface](UI.png)
 
 **[Open the website → adrinaesf.github.io/personal-website](https://adrinaesf.github.io/personal-website/)**
 

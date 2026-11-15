@@ -20,7 +20,7 @@ export function initMusic(button, status) {
     const from = audio.volume, start = performance.now();
     function step(now) {
       const t = Math.min((now - start) / 900, 1);
-      audio.volume = from + (to - from) * t;
+      audio.volume = Math.min(1, Math.max(0, from + (to - from) * t));
       if (t < 1) animation = requestAnimationFrame(step);
       else { animation = 0; done(); }
     }

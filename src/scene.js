@@ -447,31 +447,37 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     return { group, gem, x, z, baseY, phase: index * 0.9, collected: false };
   });
   const ease = t => { t = THREE.MathUtils.clamp(t, 0, 1); return t * t * (3 - 2 * t); };
-  // After the last star, a sea of low clouds rolls out from under the visitor's feet.
-  // They are faceted like the rocks and mountains, and stay below eye level.
-  const cloudCount = 720, cloudData = [];
-  const clouds = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xf3e8ec, emissive: 0x514456, emissiveIntensity: 0.6, roughness: 1, flatShading: true, transparent: true, opacity: 0.94 }), cloudCount);
-  clouds.visible = false; clouds.frustumCulled = false; scene.add(clouds);
-  while (cloudData.length < cloudCount) {
-    const x = (random() - 0.5) * 114, z = -34 + random() * 72;
-    if ([...stations.values()].some(({ group }) => Math.hypot(x - group.position.x, z - group.position.z) < 3.3)) continue;
-    cloudData.push({ x, z, y: groundHeight(x, z), width: 1.1 + random() * 1.6, height: 0.4 + random() * 0.45, phase: random() * 6.28, spin: random() * 3 });
+  // After the last star, soft mist pours out from under the visitor's feet and
+  // settles over the whole valley floor, like dry ice. It stays below eye level.
+  const mistPositions = [], mistSizes = [], mistPhases = [];
+  for (let i = 0; i < 2600; i++) {
+    const x = (random() - 0.5) * 118, z = -36 + random() * 76, size = 2.6 + random() * 3.6;
+    mistPositions.push(x, groundHeight(x, z) + size * (0.1 + random() * 0.12), z); mistSizes.push(size); mistPhases.push(random() * 6.28);
   }
-  let cloudProgress = 0, cloudX = 0, cloudZ = 0;
-  function layoutClouds() {
-    cloudData.forEach((cloud, index) => {
-      const grow = ease(cloudProgress * 2.2 - Math.hypot(cloud.x - cloudX, cloud.z - cloudZ) / 55);
-      dummy.position.set(cloud.x + Math.sin(clock * 0.12 + cloud.phase) * 0.9, cloud.y + cloud.height * 0.3 * grow - (1 - grow) * 1.2 + Math.sin(clock * 0.5 + cloud.phase) * 0.05, cloud.z + Math.cos(clock * 0.1 + cloud.phase) * 0.9);
-      dummy.rotation.set(0, cloud.spin + clock * 0.03, 0);
-      dummy.scale.set(cloud.width * grow + 0.001, cloud.height * grow + 0.001, cloud.width * (0.75 + 0.25 * Math.sin(cloud.phase)) * grow + 0.001);
-      dummy.updateMatrix(); clouds.setMatrixAt(index, dummy.matrix);
-    });
-    clouds.instanceMatrix.needsUpdate = true;
-  }
+  const mistGeometry = new THREE.BufferGeometry();
+  mistGeometry.setAttribute('position', new THREE.Float32BufferAttribute(mistPositions, 3));
+  mistGeometry.setAttribute('size', new THREE.Float32BufferAttribute(mistSizes, 1));
+  mistGeometry.setAttribute('phase', new THREE.Float32BufferAttribute(mistPhases, 1));
+  const mistMaterial = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { time: { value: 0 }, viewScale: { value: 500 }, progress: { value: 0 }, origin: { value: new THREE.Vector2() } },
+    vertexShader: `attribute float size; attribute float phase; uniform float time; uniform float viewScale; uniform float progress; uniform vec2 origin; varying float fade; varying float swirl;
+      void main(){ vec3 p=position; p.x+=sin(time*.11+phase)*1.6; p.z+=cos(time*.09+phase*1.7)*1.6; p.y+=sin(time*.4+phase*2.)*.07;
+        float grow=smoothstep(0.,1.,progress*2.2-distance(position.xz,origin)/55.);
+        vec4 mv=modelViewMatrix*vec4(p,1.); gl_Position=projectionMatrix*mv;
+        gl_PointSize=size*(.55+.45*grow)*viewScale/max(.5,-mv.z);
+        // Puffs right against the lens would flash, so they thin out up close.
+        fade=grow*smoothstep(.8,3.6,-mv.z)*(.75+.25*sin(time*.3+phase*3.)); swirl=phase+time*.05; }`,
+    fragmentShader: `varying float fade; varying float swirl;
+      void main(){ vec2 p=(gl_PointCoord-.5)*2.; float r=length(p); float lump=.8+.2*sin(atan(p.y,p.x)*5.+swirl*6.)*sin(r*5.+swirl);
+        float a=pow(smoothstep(1.,0.,r/lump),1.6)*fade*.27;
+        gl_FragColor=vec4(mix(vec3(.9,.9,.97),vec3(1.,.9,.88),.5+.5*sin(swirl*4.)),a); }`,
+  });
+  const mist = new THREE.Points(mistGeometry, mistMaterial); mist.visible = false; mist.frustumCulled = false; mist.renderOrder = 2; scene.add(mist); timed.push(mistMaterial);
   let collected = 0, celebration = -1, gazeFrom = 0;
   function celebrate() {
-    clouds.visible = true; cloudX = camera.position.x; cloudZ = camera.position.z;
-    if (paused) { starMaterial.uniforms.flare.value = 0.45; auroraMaterial.uniforms.intensity.value = 0.62; cloudProgress = 1.4; layoutClouds(); return; }
+    mist.visible = true; mistMaterial.uniforms.origin.value.set(camera.position.x, camera.position.z);
+    if (paused) { starMaterial.uniforms.flare.value = 0.45; auroraMaterial.uniforms.intensity.value = 0.62; mistMaterial.uniforms.progress.value = 1.4; return; }
     celebration = 0; gazeFrom = pitch; showerLeft = 70; showerGap = 0.6;
   }
   function updateCelebration(delta) {
@@ -488,7 +494,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
   function updateWorld(delta) {
     if (!paused) {
       updateMeteors(delta); updateCelebration(delta);
-      if (clouds.visible) { cloudProgress = Math.min(1.4, cloudProgress + delta / 6); layoutClouds(); }
+      if (mist.visible) mistMaterial.uniforms.progress.value = Math.min(1.4, mistMaterial.uniforms.progress.value + delta / 6);
       flames.forEach((flame, index) => {
         flame.scale.y = 1 + Math.sin(clock * 9 + index * 2) * 0.16 + Math.sin(clock * 23 + index) * 0.08;
         flame.scale.x = flame.scale.z = 1 + Math.sin(clock * 13 + index * 3) * 0.1;
@@ -621,6 +627,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     renderer.setPixelRatio(ratio); renderer.setSize(width, height, false);
     camera.aspect = width / height; camera.fov = width < 700 ? 70 : 62; camera.updateProjectionMatrix();
     for (const material of timed) if (material.uniforms.pixelRatio) material.uniforms.pixelRatio.value = ratio;
+    mistMaterial.uniforms.viewScale.value = height * ratio / (2 * Math.tan(camera.fov * Math.PI / 360));
     render();
   }
   function look(dx, dy) {

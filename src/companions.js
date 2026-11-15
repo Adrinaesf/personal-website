@@ -101,13 +101,14 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
   taperedTube(tail, [[.02, -.19, .43], [.04, -.27, .65], [.055, -.28, .77]], [.056, .035, .008], cream, 10, 8);
 
   const target = new THREE.Vector3();
-  let initialized = false, gait = 0, waiting = 1.5, catchingUp = false;
+  let initialized = false, gait = 0, waiting = 1.5, catchingUp = false, travelTime = 0, side = 1, holdSide = 0, checkTime = 0, checkX = 0, checkZ = 0, headingX = 0, headingZ = 0;
   const clamp = THREE.MathUtils.clamp;
-  function safePoint(x, z, player) {
+  // Everything the dog keeps clear of: the visitor first, then each landmark with a margin.
+  const playerDisc = { x: 0, z: 0, radius: 3.2 };
+  const discs = [playerDisc, ...obstacles.map(obstacle => ({ x: obstacle.x, z: obstacle.z, radius: (obstacle.radius || 2.5) + .5 }))];
+  const valid = (px, pz) => px >= -40 && px <= 40 && pz >= -24 && pz <= 29 && discs.every(disc => Math.hypot(px - disc.x, pz - disc.z) >= disc.radius - .00001);
+  function samplePoint(x, z) {
     const requestedX = clamp(x, -40, 40), requestedZ = clamp(z, -24, 29);
-    const discs = [{ x: player.x, z: player.z, radius: 3.2 }, ...obstacles.map(obstacle => ({ ...obstacle, radius: (obstacle.radius || 2.5) + .5 }))];
-    const valid = (px, pz) => px >= -40 && px <= 40 && pz >= -24 && pz <= 29 && discs.every(disc => Math.hypot(px - disc.x, pz - disc.z) >= disc.radius - .00001);
-    if (valid(requestedX, requestedZ)) return { x: requestedX, z: requestedZ };
     let best = null, bestDistance = Infinity;
     function consider(px, pz) {
       if (!valid(px, pz)) return;
@@ -116,7 +117,6 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
     }
     // Resolve all exclusion discs together: projecting onto one obstacle and
     // then the visitor can otherwise place the dog back inside the first one.
-    // Boundary samples only run when a collision actually needs correction.
     for (const disc of discs) {
       const baseAngle = Math.atan2(requestedX - disc.x, requestedZ - disc.z);
       for (let i = 0; i < 48; i++) {
@@ -130,12 +130,32 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
     for (let px = -40; px <= 40; px += 4) for (let pz = -24; pz <= 29; pz += 4) consider(px, pz);
     return best || { x: dog.position.x, z: dog.position.z };
   }
+  function safePoint(x, z, player) {
+    playerDisc.x = player.x; playerDisc.z = player.z;
+    let px = clamp(x, -40, 40), pz = clamp(z, -24, 29);
+    // Pushing straight out of each disc moves the dog smoothly, a little per frame.
+    // Only a pocket squeezed between the visitor and a landmark needs the sampled search.
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
+      for (const disc of discs) {
+        const dx = px - disc.x, dz = pz - disc.z, d = Math.hypot(dx, dz);
+        if (d >= disc.radius) continue;
+        const nx = d > .0001 ? dx / d : 1, nz = d > .0001 ? dz / d : 0;
+        px = disc.x + nx * (disc.radius + .002); pz = disc.z + nz * (disc.radius + .002); moved = true;
+      }
+      const cx = clamp(px, -40, 40), cz = clamp(pz, -24, 29);
+      if (cx !== px || cz !== pz) { px = cx; pz = cz; moved = true; }
+      if (!moved) return { x: px, z: pz };
+    }
+    return samplePoint(x, z);
+  }
   function selectWanderTarget(player) {
+    travelTime = 0;
     for (let i = 0; i < 20; i++) {
       const angle = random() * Math.PI * 2, radius = 6 + random() * 7;
       const point = safePoint(player.x + Math.sin(angle) * radius, player.z + Math.cos(angle) * radius, player);
       if (Math.hypot(point.x - player.x, point.z - player.z) < 5) continue;
-      if (obstacles.some(obstacle => Math.hypot(point.x - obstacle.x, point.z - obstacle.z) < (obstacle.radius || 2.5) + .6)) continue;
+      if (obstacles.some(obstacle => Math.hypot(point.x - obstacle.x, point.z - obstacle.z) < (obstacle.radius || 2.5) + .9)) continue;
       target.set(point.x, 0, point.z); return;
     }
     target.copy(dog.position);
@@ -145,8 +165,8 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
     delta = clamp(delta, 0, .05);
     const forwardX = -Math.sin(yaw), forwardZ = -Math.cos(yaw), rightX = Math.cos(yaw), rightZ = -Math.sin(yaw);
     if (!initialized) {
-      const side = 2.5 * clamp(getAspect() / 1.5, .42, 1);
-      const point = safePoint(position.x + forwardX * 6 + rightX * side, position.z + forwardZ * 6 + rightZ * side, position);
+      const offset = 2.5 * clamp(getAspect() / 1.5, .42, 1);
+      const point = safePoint(position.x + forwardX * 6 + rightX * offset, position.z + forwardZ * 6 + rightZ * offset, position);
       dog.position.set(point.x, groundHeight(point.x, point.z) + .005, point.z);
       dog.rotation.y = yaw + .5; target.copy(dog.position); initialized = true;
     }
@@ -163,36 +183,59 @@ export function createCompanions({ scene, groundHeight, getAspect = () => 16 / 9
         waiting -= delta;
         if (waiting <= 0) selectWanderTarget(position);
       } else if (Math.hypot(target.x - dog.position.x, target.z - dog.position.z) < .35) waiting = 1.5 + random() * 3.5;
+      // Give up on a spot that turned out to be awkward to reach, and rest instead.
+      else if ((travelTime += delta) > 8) waiting = .8 + random() * 1.5;
     }
+    playerDisc.x = position.x; playerDisc.z = position.z;
     if (waiting <= 0) {
       let dx = target.x - dog.position.x, dz = target.z - dog.position.z;
       const distance = Math.hypot(dx, dz);
-      // Gently steer around raised landmark platforms while roaming.
-      for (const obstacle of obstacles) {
-        const ox = obstacle.x - dog.position.x, oz = obstacle.z - dog.position.z;
-        const along = (ox * dx + oz * dz) / Math.max(distance, .001);
-        const perpendicular = Math.abs(ox * dz - oz * dx) / Math.max(distance, .001);
-        if (along > 0 && along < 4 && perpendicular < (obstacle.radius || 2.5) + .8) {
-          const sign = ox * dz - oz * dx > 0 ? 1 : -1;
-          const rotateX = dz * sign, rotateZ = -dx * sign;
-          dx = dx * .35 + rotateX * .75; dz = dz * .35 + rotateZ * .75;
+      if (distance > .001) {
+        dx /= distance; dz /= distance;
+        // When something stands between the dog and where he is going, he walks
+        // around its edge and keeps to the same side until the way is clear.
+        for (const disc of discs) {
+          const cx = disc.x - dog.position.x, cz = disc.z - dog.position.z, d = Math.hypot(cx, cz);
+          const along = clamp(cx * dx + cz * dz, 0, distance);
+          if (d < .0001 || d > disc.radius + 1.2 || Math.hypot(cx - dx * along, cz - dz * along) >= disc.radius - .05) continue;
+          const nx = cx / d, nz = cz / d, into = dx * nx + dz * nz;
+          let tx = dx - nx * into, tz = dz - nz * into;
+          const tangent = Math.hypot(tx, tz);
+          if (tangent < .2 || holdSide > 0) { tx = -nz * side; tz = nx * side; }
+          else { tx /= tangent; tz /= tangent; side = tx * -nz + tz * nx >= 0 ? 1 : -1; }
+          // Lean slightly outward so the walk hugs the edge without touching it.
+          const lean = d < disc.radius + .25 ? .25 : 0;
+          dx = tx - nx * lean; dz = tz - nz * lean;
+          const length = Math.hypot(dx, dz); dx /= length; dz /= length;
           break;
         }
+        const step = Math.min(distance, (catchingUp ? 8 : 2.6) * delta);
+        dog.position.x += dx * step; dog.position.z += dz * step;
       }
-      const length = Math.hypot(dx, dz), step = Math.min(distance, (catchingUp ? 8 : 2.6) * delta);
-      if (length > .001) {
-        const point = safePoint(dog.position.x + dx / length * step, dog.position.z + dz / length * step, position);
-        dog.position.x = point.x; dog.position.z = point.z;
+    }
+    // Pinched between the visitor and a landmark, he would pace on the spot.
+    // Once a second, check for progress; without any, turn around the other way.
+    holdSide -= delta;
+    if (waiting > 0) { checkTime = 0; checkX = dog.position.x; checkZ = dog.position.z; }
+    else if ((checkTime += delta) > 1) {
+      if (Math.hypot(dog.position.x - checkX, dog.position.z - checkZ) < .6) {
+        side = -side; holdSide = 3;
+        if (!catchingUp) { waiting = 1 + random() * 2; holdSide = 0; }
       }
+      checkTime = 0; checkX = dog.position.x; checkZ = dog.position.z;
     }
     // Keep a comfortable clearance if the visitor walks directly toward the dog.
     const safe = safePoint(dog.position.x, dog.position.z, position);
     dog.position.x = safe.x; dog.position.z = safe.z;
     dog.position.y = groundHeight(dog.position.x, dog.position.z) + .005;
-    const dx = dog.position.x - oldX, dz = dog.position.z - oldZ, travelling = Math.hypot(dx, dz) > .001;
+    const dx = dog.position.x - oldX, dz = dog.position.z - oldZ, travelling = Math.hypot(dx, dz) > delta * .4;
     if (travelling) {
-      const targetYaw = Math.atan2(-dx, -dz);
-      dog.rotation.y += Math.atan2(Math.sin(targetYaw - dog.rotation.y), Math.cos(targetYaw - dog.rotation.y)) * Math.min(1, delta * 7);
+      // Turn toward the averaged direction of travel, so small corrections
+      // at a landmark's edge never make him twitch.
+      const blend = 1 - Math.exp(-delta * 6), speed = Math.max(delta, .0001);
+      headingX += (dx / speed - headingX) * blend; headingZ += (dz / speed - headingZ) * blend;
+      const targetYaw = Math.atan2(-headingX, -headingZ);
+      dog.rotation.y += Math.atan2(Math.sin(targetYaw - dog.rotation.y), Math.cos(targetYaw - dog.rotation.y)) * Math.min(1, delta * 5);
     }
     if (travelling) gait += delta * (catchingUp ? 14 : 10);
     const amplitude = travelling ? .48 : 0;

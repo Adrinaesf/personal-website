@@ -11,10 +11,10 @@ A personal portfolio you explore as a first-person game. Walk through a red-lit,
 - **An explorable 3D world:** procedural mountains, textured terrain, and 1,600 instanced stones.
 - **A living sky:** twinkling stars, shooting stars, a crescent moon, an aurora over the northern ridge, fireflies, and a campfire.
 - **Five discoverable locations:** Base camp, Project archive, Observatory, Radio station, and My life.
-- **Seven fallen stars to collect:** each sends up a column of light; finding all seven starts a meteor shower.
+- **Seven fallen stars to collect:** each sends up a column of light; finding all seven lights up every star in the sky, with a meteor shower and a brighter aurora.
 - **A scrapbook interface:** journals open as paper pages with taped polaroids, and every control is a hand-drawn paper tag.
 - **Game navigation:** walking, drag-to-look, illuminated paths, a compass, destination tabs, a map, and a return-to-camp control.
-- **A roaming guide:** a small dog that introduces the world, then walks, pauses, sniffs, avoids landmarks, and catches up when the visitor moves away. Selecting him opens the story of the real dog by the river who inspired him.
+- **A roaming guide:** River, a small dog who introduces the world, then walks, pauses, sniffs, avoids landmarks, and catches up when the visitor moves away. Selecting him opens the story of the real dog by the river who inspired him.
 - **A personal journal:** resume-backed projects and experience, plus hiking, friends, hackathons, animals, and robotics interests, with Adrina’s own photographs. Four of them also hang as polaroids on a line at the campsite.
 - **Music controls:** the supplied soundtrack is enabled by default, with an Off button, fades, looping, and background pause. If the browser blocks autoplay, selecting Enter starts playback.
 - **Accessible alternatives:** keyboard and touch controls, reduced-motion support, readable journals, and direct journal access through the map when WebGL is unavailable.

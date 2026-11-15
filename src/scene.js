@@ -298,9 +298,13 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
   starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
   const starMaterial = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
-    uniforms: { time: { value: 0 }, pixelRatio: { value: 1 } },
-    vertexShader: `attribute float size; attribute float phase; attribute vec3 color; varying vec3 tint; varying float shimmer; uniform float time; uniform float pixelRatio;
-      void main(){ tint=color; shimmer=0.6+0.4*sin(time*(0.7+fract(phase*3.7)*1.9)+phase)*sin(time*0.23+phase*2.0); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); gl_PointSize=size*pixelRatio*(0.8+0.35*shimmer); }`,
+    uniforms: { time: { value: 0 }, pixelRatio: { value: 1 }, flare: { value: 0 } },
+    vertexShader: `attribute float size; attribute float phase; attribute vec3 color; varying vec3 tint; varying float shimmer; uniform float time; uniform float pixelRatio; uniform float flare;
+      void main(){ shimmer=0.6+0.4*sin(time*(0.7+fract(phase*3.7)*1.9)+phase)*sin(time*0.23+phase*2.0);
+        // When every fallen star is found, a slow wave of light rolls across the whole sky.
+        float wave=0.5+0.5*sin(time*2.4+position.x*.02+position.z*.015+phase*.3);
+        shimmer=mix(shimmer,0.7+0.6*wave,flare*.75)*(1.+flare*1.3); tint=mix(color,vec3(1.,.9,.72),flare*.4);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); gl_PointSize=size*pixelRatio*(0.8+0.35*shimmer)*(1.+flare*1.1); }`,
     fragmentShader: `varying vec3 tint; varying float shimmer;
       void main(){ vec2 p=gl_PointCoord-.5; float r=length(p); float core=exp(-r*r*36.); float glow=exp(-r*r*9.)*.22; float cross=(exp(-abs(p.x)*70.)*exp(-abs(p.y)*7.)+exp(-abs(p.y)*70.)*exp(-abs(p.x)*7.))*.24; gl_FragColor=vec4(tint,(core+glow+cross)*shimmer*1.5); }`,
   });
@@ -442,10 +446,26 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
     const glow = new THREE.Sprite(glowMaterial); glow.scale.setScalar(2.4); group.add(glow);
     return { group, gem, x, z, baseY, phase: index * 0.9, collected: false };
   });
-  let collected = 0;
+  let collected = 0, celebration = -1, gazeFrom = 0;
+  const ease = t => { t = THREE.MathUtils.clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  function celebrate() {
+    if (paused) { starMaterial.uniforms.flare.value = 0.45; auroraMaterial.uniforms.intensity.value = 0.62; return; }
+    celebration = 0; gazeFrom = pitch; showerLeft = 70; showerGap = 0.6;
+  }
+  function updateCelebration(delta) {
+    if (celebration < 0) return;
+    celebration += delta;
+    // Swell for a moment, hold, then settle into a sky that stays brighter than before.
+    const swell = celebration < 9 ? ease(celebration / 1.6) : 1 - ease((celebration - 9) / 5) * 0.55;
+    starMaterial.uniforms.flare.value = swell;
+    auroraMaterial.uniforms.intensity.value = 0.38 + swell * 0.55;
+    // Tilt the view up once, unless the visitor is already steering.
+    if (celebration < 2.4 && !drag && !travel) pitch = THREE.MathUtils.lerp(gazeFrom, Math.max(gazeFrom, 0.6), ease(celebration / 2.4));
+    if (celebration > 14) celebration = -1;
+  }
   function updateWorld(delta) {
     if (!paused) {
-      updateMeteors(delta);
+      updateMeteors(delta); updateCelebration(delta);
       flames.forEach((flame, index) => {
         flame.scale.y = 1 + Math.sin(clock * 9 + index * 2) * 0.16 + Math.sin(clock * 23 + index) * 0.08;
         flame.scale.x = flame.scale.z = 1 + Math.sin(clock * 13 + index * 3) * 0.1;
@@ -460,7 +480,7 @@ export function initScene({ canvas, onReady = () => {}, onSelect = () => {}, onP
       if (active && Math.hypot(camera.position.x - shard.x, camera.position.z - shard.z) < 1.9) {
         shard.collected = true; shard.group.visible = false; collected++;
         launchMeteor(0.8); onCollect({ count: collected, total: shards.length });
-        if (collected === shards.length) auroraMaterial.uniforms.intensity.value = 0.62;
+        if (collected === shards.length) celebrate();
       }
     }
   }

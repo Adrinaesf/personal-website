@@ -13,6 +13,7 @@
 <main id="game">
   <canvas id="landscape" tabindex="0" aria-label="First-person mountain world. Use W A S D or arrow keys to walk, drag to look, and E to interact. Use the Map button for direct navigation."></canvas>
   <div class="vignette" aria-hidden="true"></div>
+  <div class="sky-flash" aria-hidden="true"></div>
 
   <header class="game-header">
     <div class="identity"><span class="star-symbol" aria-hidden="true">✧</span>Adrina Esfandiari</div>
@@ -34,6 +35,7 @@
       <li data-discovery="wanderer"><button type="button" data-destination="wanderer"><span class="discovery-mark" aria-label="Not yet discovered"></span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="10.5" r="1.7"/><circle cx="10.5" cy="6.5" r="1.7"/><circle cx="15" cy="7" r="1.7"/><circle cx="18" cy="11.5" r="1.7"/><path d="M12 12.5c-3 0-5.5 3-5.5 5.3 0 1.6 1.5 2.5 3 2.2 1.3-.3 1.7-.8 2.5-.8s1.2.5 2.5.8c1.5.3 3-.6 3-2.2 0-2.3-2.5-5.3-5.5-5.3Z"/></svg><span class="journal-label">? ? ?</span></button></li>
     </ul>
     <p class="star-line"><span aria-hidden="true">✦</span> fallen stars <span id="star-count">0 / 7</span></p>
+    <p class="star-hint">find all 7, then look up</p>
   </aside>
 
   <div id="world-markers"></div>
@@ -44,7 +46,7 @@
   <div class="guide" id="guide" hidden>
     <img class="guide-portrait" src="assets/photos/river-dog.jpg" alt="" width="84" height="84">
     <div class="guide-body">
-      <p class="guide-name">the wanderer</p>
+      <p class="guide-name">River</p>
       <p class="guide-text" id="guide-text" aria-live="polite"></p>
       <div class="guide-actions"><button id="guide-skip" type="button">skip</button><button id="guide-next" class="tag" type="button">next ›</button></div>
     </div>
@@ -116,8 +118,8 @@
     <dl>
       <div><dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys</dt><dd>Walk through the landscape</dd></div>
       <div><dt>Drag the view</dt><dd>Look around, including up at the stars</dd></div>
-      <div><dt><kbd>E</kbd> or select a marker</dt><dd>Open a nearby place, or say hi to the dog</dd></div>
-      <div><dt>Walk into a fallen star</dt><dd>Pick it up. There are seven.</dd></div>
+      <div><dt><kbd>E</kbd> or select a marker</dt><dd>Open a nearby place, or say hi to River the dog</dd></div>
+      <div><dt>Walk into a fallen star</dt><dd>Pick it up. Find all seven and the whole sky lights up.</dd></div>
       <div><dt>Map</dt><dd>Travel straight to a place</dd></div>
       <div><dt><kbd>Esc</kbd></dt><dd>Close the journal or map</dd></div>
     </dl>
@@ -212,6 +214,7 @@
       <figure class="polaroid tilt-left"><img src="assets/photos/hike-viewpoint.jpg" alt="Adrina standing on a hillside under heavy grey clouds, with green hills behind her." loading="lazy" width="975" height="1300"><figcaption>me, up in the hills</figcaption></figure>
       <figure class="polaroid tilt-right"><img src="assets/photos/trail.jpg" alt="A leaf-covered trail running through tall green trees." loading="lazy" width="1034" height="1300"><figcaption>leaves on the trail</figcaption></figure>
     </div>
+    <figure class="polaroid solo-wide tilt-left"><img src="assets/photos/kylie-hike.jpg" alt="Adrina sitting on a mossy fallen tree in a misty forest, holding her white dog Kylie." loading="lazy" width="1300" height="975"><figcaption>Kylie comes hiking too</figcaption></figure>
   </article>
 
   <article class="chapter">
@@ -229,23 +232,29 @@
   <article class="chapter">
     <h3><span class="chapter-number">3</span>Hackathons together</h3>
     <p>Hackathons are even better with my friends. We build things, make memories, and laugh a lot along the way.</p>
+    <figure class="polaroid solo tilt-right"><img src="assets/photos/hackathon-team.jpg" alt="Adrina and three friends smiling around a table covered in laptops, coffee cups and snacks at a hackathon." loading="lazy" width="975" height="1300"><figcaption>our table, mid-hackathon</figcaption></figure>
   </article>
 
   <article class="chapter">
     <h3><span class="chapter-number">4</span>Dogs, cats &amp; curiosity</h3>
     <p>I love both dogs and cats, though I’m probably more of a dog person.</p>
-    <figure class="polaroid solo tilt-right"><img src="assets/photos/kylie-window.jpg" alt="Kylie, a fluffy white dog, seen from behind as she looks out of a car window at mountains and a sunset sky." loading="lazy" width="1087" height="1300"><figcaption>This is Kylie. She’s living here for the first time too, so let’s make the best of it.</figcaption></figure>
+    <p>This is Kylie, my dog. She was about a month old when we got her, and she’s around nine now.</p>
+    <div class="photo-pair">
+      <figure class="polaroid tilt-left"><img src="assets/photos/kylie-puppy.jpg" alt="Kylie as a tiny white puppy sitting on an orange cushion." loading="lazy" width="1206" height="645"><figcaption>one month old, when we got her</figcaption></figure>
+      <figure class="polaroid tilt-right"><video src="assets/photos/kylie-grass.mp4" poster="assets/photos/kylie-grass.jpg" width="320" height="568" autoplay loop muted playsinline aria-label="A short silent video of Kylie, now a fluffy white grown-up dog, in the grass."></video><figcaption>and now</figcaption></figure>
+    </div>
+    <figure class="polaroid solo tilt-right"><img src="assets/photos/kylie-window.jpg" alt="Kylie, a fluffy white dog, seen from behind as she looks out of a car window at mountains and a sunset sky." loading="lazy" width="1087" height="1300"><figcaption>She’s living here for the first time too, so let’s make the best of it.</figcaption></figure>
     <p>I’m also interested in robotics. There’s a lot more to me than one subject or project, and I like having room to explore.</p>
   </article>
 </section></template>
 
 <template id="content-wanderer"><section class="page">
-  <p class="kicker">the wanderer · why there’s a dog here</p>
+  <p class="kicker">river · why there’s a dog here</p>
   <h2>The dog by the river</h2>
   <figure class="polaroid solo tilt-left"><img src="assets/photos/river-dog.jpg" alt="A large white and brown dog sitting calmly on a grassy riverbank, with bare trees behind him." width="1008" height="1300"><figcaption>the real one</figcaption></figure>
-  <p class="lead">I met him next to a river.</p>
-  <p>No one else was there. He was just walking around by himself, and he was so free.</p>
-  <p class="scribble">He always reminds me to be as free as possible.</p>
-  <p>So I made a little dog for this world. He goes wherever he wants.</p>
+  <p class="lead">This really happened. I was next to a river, and I saw this dog.</p>
+  <p>There was no one around him. He was just walking by the water, doing the things he enjoyed, out in nature. He was so free, and I loved that.</p>
+  <p class="scribble">I always try to remind myself to be a free person, and to do the things that make me happy.</p>
+  <p>So I put a little dog in this world to remind me. I call him River, after the place I met him. He goes wherever he wants.</p>
 </section></template>
 </body></html>

@@ -3,7 +3,7 @@ import { initMusic } from './music.js';
 
 const $ = selector => document.querySelector(selector);
 const music = initMusic($('#music-toggle'), $('#music-status'));
-const names = { about: 'Base camp', projects: 'Project archive', research: 'Observatory', contact: 'Radio station', life: 'My life', wanderer: 'The wanderer' };
+const names = { about: 'Base camp', projects: 'Project archive', research: 'Observatory', contact: 'Radio station', life: 'My life', wanderer: 'River' };
 const total = Object.keys(names).length;
 const discovered = new Set();
 const journal = $('#journal');
@@ -75,9 +75,14 @@ function chime(step) {
 function onCollect({ count, total: stars }) {
   $('#star-count').textContent = `${count} / ${stars}`;
   $('.star-line').classList.toggle('complete', count === stars);
-  chime(count - 1);
-  if (count < stars) showToast(`✦ You picked up a fallen star · ${count} of ${stars}`);
-  else { showToast('✦ All seven fallen stars'); scene?.meteorShower(); say('That’s all seven. Look up.'); }
+  if (count < stars) chime(count - 1);
+  if (count < stars) showToast(`✦ ${count} of ${stars} · ${stars - count} more and the sky wakes up`);
+  else {
+    showToast('✦ All seven. Look up!');
+    for (let step = 0; step < 7; step++) setTimeout(() => chime(step), 250 + step * 120);
+    document.body.classList.add('celebrating'); setTimeout(() => document.body.classList.remove('celebrating'), 3000);
+    say('That’s all seven. Look up.', 'Every star is out for you tonight.');
+  }
 }
 
 function paintDiscoveries() {
@@ -133,7 +138,7 @@ function updateMarkers(markers) {
     el.dataset.distance = String(item.distance || 0);
     el.style.transform = `translate(${item.x}px,${item.y}px) translate(-50%,-100%)`;
     if (item.id === 'wanderer') {
-      el.querySelector('.marker-name').textContent = discovered.has('wanderer') ? 'the wanderer' : 'say hi';
+      el.querySelector('.marker-name').textContent = discovered.has('wanderer') ? 'River' : 'say hi';
       el.setAttribute('aria-label', 'Meet the wandering dog');
     } else {
       el.setAttribute('aria-label', `${item.distance > 9 ? 'Walk to' : 'Inspect'} ${names[item.id]}`);
@@ -150,7 +155,7 @@ function updateMarkers(markers) {
     const prompt = $('#interaction-prompt');
     prompt.hidden = !state.nearest || anyDialogOpen() || !entered || !guide.hidden;
     if (!prompt.hidden) {
-      const action = state.nearest === 'wanderer' ? 'Say hi to the dog' : `Open ${names[state.nearest]}`;
+      const action = state.nearest === 'wanderer' ? 'Say hi to River' : `Open ${names[state.nearest]}`;
       prompt.innerHTML = touch.matches ? `Tap the marker · ${action}` : `<kbd>E</kbd> ${action}`;
     }
   }
@@ -184,11 +189,11 @@ $('#enter-button').addEventListener('click', () => {
   if (!scene) { map.showModal(); syncActivity(); return; }
   say(
     'Oh, hi. You found Adrina’s little world.',
-    'I’m the dog who wanders around here. Nobody tells me where to go.',
+    'I’m River. I wander around here, and nobody tells me where to go.',
     touch.matches
       ? 'Five places out there have a light on. Walk up to one and tap its marker to read what Adrina left inside.'
       : 'Five places out there have a light on. Walk up to one and press E to read what Adrina left inside.',
-    'Stars fall here sometimes. If you see one glowing on the ground, go and pick it up.',
+    'Seven stars have fallen in this valley. Find all seven, and watch what the sky does.',
     'That’s all. Go wherever you want. I’ll be around.',
   );
 });
@@ -227,3 +232,4 @@ for (const button of document.querySelectorAll('[data-destination]')) {
     }
   });
 }
+

@@ -1,0 +1,2 @@
+# The generated bundle embeds upstream shader strings with significant formatting.
+dist/assets/app.js -whitespace linguist-generated=true

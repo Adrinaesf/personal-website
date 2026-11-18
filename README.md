@@ -10,7 +10,7 @@ A personal portfolio you explore as a first-person game. Walk through a red-lit,
 
 - **An explorable 3D world:** procedural mountains, textured terrain, and 1,600 instanced stones.
 - **A living sky:** twinkling stars, shooting stars, a crescent moon, an aurora over the northern ridge, fireflies, and a campfire.
-- **Five discoverable locations:** About me, My projects, My experience, Contact me, and Off the clock.
+- **Five discoverable locations:** About me, My projects, My experience, Contact me, and My hobbies.
 - **Seven fallen stars to collect:** each sends up a column of light; finding all seven lights up every star in the sky, with a meteor shower and a brighter aurora, and sends soft mist rolling across the valley floor.
 - **A scrapbook interface:** journals open as paper pages with taped polaroids, and every control is a hand-drawn paper tag.
 - **Game navigation:** walking, drag-to-look, illuminated paths, a compass, destination tabs, a map, and a return-to-camp control.

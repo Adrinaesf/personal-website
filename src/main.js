@@ -3,7 +3,7 @@ import { initMusic } from './music.js';
 
 const $ = selector => document.querySelector(selector);
 const music = initMusic($('#music-toggle'), $('#music-status'));
-const names = { about: 'About me', projects: 'My projects', research: 'My experience', contact: 'Contact me', life: 'Off the clock', wanderer: 'River' };
+const names = { about: 'About me', projects: 'My projects', research: 'My experience', contact: 'Contact me', life: 'My hobbies', wanderer: 'River' };
 const total = Object.keys(names).length;
 const discovered = new Set();
 const journal = $('#journal');

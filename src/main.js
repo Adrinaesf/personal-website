@@ -3,7 +3,7 @@ import { initMusic } from './music.js';
 
 const $ = selector => document.querySelector(selector);
 const music = initMusic($('#music-toggle'), $('#music-status'));
-const names = { about: 'Base camp', projects: 'Project archive', research: 'Observatory', contact: 'Radio station', life: 'My life', wanderer: 'River' };
+const names = { about: 'About me', projects: 'My projects', research: 'My experience', contact: 'Contact me', life: 'My life', wanderer: 'River' };
 const total = Object.keys(names).length;
 const discovered = new Set();
 const journal = $('#journal');
@@ -169,7 +169,7 @@ try {
   syncActivity();
 } catch (error) {
   console.warn('The 3D world could not start.', error);
-  $('#load-status').textContent = '3D is unavailable on this device. Enter to open the field journal.';
+  $('#load-status').textContent = '3D is unavailable on this device. Enter to open my journal.';
   document.body.classList.add('world-unavailable');
 }
 function paintMotion() {
